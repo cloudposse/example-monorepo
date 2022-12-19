@@ -8,14 +8,80 @@ permissions:
   id-token: write
 
 jobs:
-  do:
-    uses: cloudposse/github-actions-workflows/.github/workflows/docker-ecr-eks-helmfile-main-branch.yml@main
+  monorepo:
+    uses:  cloudposse/github-actions-workflows/.github/workflows/controller-monorepo.yml@main
     with:
-      organization: "${{ github.event.repository.owner.login }}"
-      repository: "${{ github.event.repository.name }}"
+      dir: ./apps
+
+  ci:
+    needs: [monorepo]
+    uses: cloudposse/github-actions-workflows/.github/workflows/ci-dockerized-app-promote-or-build.yml@main
+    if: ${{ needs.monorepo.outputs.apps != '[]' }}
+    strategy:
+      matrix:
+        app: ${{ fromJson(needs.monorepo.outputs.apps) }}
+    with:
+      organization: ${{ github.event.repository.owner.login }}
+      repository: ${{ github.event.repository.name }}
+      app: ${{ matrix.app }}
+      force-build: ${{ contains(fromJson(needs.monorepo.outputs.changes), matrix.app) }}
+      matrix-step-name: ci
+      matrix-key: ${{ matrix.app }}
     secrets:
-      github-private-actions-pat: "${{ secrets.PUBLIC_REPO_ACCESS_TOKEN }}"
-      registry: "${{ secrets.ECR_REGISTRY }}"
-      secret-outputs-passphrase: "${{ secrets.GHA_SECRET_OUTPUT_PASSPHRASE }}"
-      ecr-region: "${{ secrets.ECR_REGION }}"
-      ecr-iam-role: "${{ secrets.ECR_IAM_ROLE }}"
+      ecr-iam-role: ${{ secrets.ECR_IAM_ROLE }}
+      registry: ${{ secrets.ECR_REGISTRY }}
+      secret-outputs-passphrase: ${{ secrets.GHA_SECRET_OUTPUT_PASSPHRASE }}
+
+  ci-outputs:
+    runs-on: ubuntu-latest
+    needs: [ci]
+    steps:
+      - uses: cloudposse/github-action-matrix-outputs-read@0.1.0
+        id: current
+        with:
+          matrix-step-name: ci
+    outputs:
+      image: ${{ toJson(fromJson(steps.current.outputs.result).image) }}
+      tag: ${{ toJson(fromJson(steps.current.outputs.result).tag) }}
+
+  test:
+    runs-on: ubuntu-latest
+    needs: [ci-outputs]
+    steps:
+      - name: Tests
+        id: test
+        uses: cloudposse/github-action-docker-compose-test-run@0.1.2
+        with:
+          file: test/docker-compose.yml
+          # build for `foo` with image `foo` from the images list
+          images: ${{ needs.ci-outputs.outputs.image }}
+          command: test/test.sh
+          registry: ${{ secrets.ECR_REGISTRY }}
+
+  cd:
+    uses: cloudposse/github-actions-workflows/.github/workflows/cd-ecs.yml@main
+    needs: [ ci-outputs, test ]
+    if: ${{ needs.monorepo.outputs.apps != '[]' }}
+    strategy:
+      matrix:
+        app: ${{ fromJson(needs.monorepo.outputs.apps) }}
+    with:
+      image: ${{ fromJson(needs.ci-outputs.outputs.image)[matrix.app] }}
+      tag: ${{ fromJson(needs.ci-outputs.outputs.tag)[matrix.app] }}
+      repository: ${{ github.event.repository.name }}
+      app: ${{ matrix.app }}
+      environment: dev
+      spacelift-organization: ${{ github.event.repository.owner.login }}
+      matrix-step-name: cd
+      matrix-key: ${{ matrix.app }}
+    secrets:
+      secret-outputs-passphrase: ${{ secrets.GHA_SECRET_OUTPUT_PASSPHRASE }}
+      github-private-actions-pat: ${{ secrets.PUBLIC_REPO_ACCESS_TOKEN }}
+      spacelift-api-key-id: ${{ secrets.SPACELIFT_API_KEY_ID }}
+      spacelift-api-key-secret: ${{ secrets.SPACELIFT_API_KEY_SECRET }}
+
+  release:
+    uses:  cloudposse/github-actions-workflows/.github/workflows/controller-draft-release.yml@main
+    needs: [ cd ]
+    secrets:
+      github-private-actions-pat: ${{ secrets.PUBLIC_REPO_ACCESS_TOKEN }}
