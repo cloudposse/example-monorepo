@@ -28,6 +28,7 @@ jobs:
       matrix-step-name: ci
       matrix-key: ${{ matrix.app }}
     secrets:
+      ecr-region: ${{ secrets.ECR_REGION }}
       ecr-iam-role: ${{ secrets.ECR_IAM_ROLE }}
       registry: ${{ secrets.ECR_REGISTRY }}
       secret-outputs-passphrase: ${{ secrets.GHA_SECRET_OUTPUT_PASSPHRASE }}
