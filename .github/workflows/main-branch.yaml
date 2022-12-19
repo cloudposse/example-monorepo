@@ -45,6 +45,7 @@ jobs:
       tag: ${{ toJson(fromJson(steps.current.outputs.result).tag) }}
 
   test:
+    name: test/integration
     runs-on: ubuntu-latest
     needs: [ci-outputs]
     steps:
