@@ -50,15 +50,24 @@ jobs:
     runs-on: ubuntu-latest
     needs: [ci-outputs]
     steps:
-      - name: Tests
-        id: test
-        uses: cloudposse/github-action-docker-compose-test-run@0.1.2
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1.7.0
         with:
-          file: test/docker-compose.yml
-          # build for `foo` with image `foo` from the images list
-          images: ${{ needs.ci-outputs.outputs.image }}
-          command: test/test.sh
-          registry: ${{ secrets.ECR_REGISTRY }}
+          aws-region: ${{ secrets.ECR_REGION }}
+          role-to-assume: ${{ secrets.ECR_IAM_ROLE }}
+
+#      - name: Tests
+#        id: test
+#        uses: cloudposse/github-action-docker-compose-test-run@0.1.2
+#        with:
+#          file: test/docker-compose.yml
+#          # build for `foo` with image `foo` from the images list
+#          images: ${{ needs.ci-outputs.outputs.image }}
+#          command: test/test.sh
+#          registry: ${{ secrets.ECR_REGISTRY }}
 
   cd:
     uses: cloudposse/github-actions-workflows/.github/workflows/cd-ecs.yml@main
