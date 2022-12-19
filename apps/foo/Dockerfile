@@ -21,7 +21,6 @@ EXPOSE 8080
 WORKDIR /app
 
 # Copy the helmfile deployment configuration
-COPY deploy/ /deploy/
 COPY public/ /app/public/
 
 # Install the app
