@@ -72,7 +72,7 @@ jobs:
   cd-production:
     name: cd / production
     uses: cloudposse/github-actions-workflows/.github/workflows/cd-ecs.yml@main
-    needs: [ monorepo, ci-outputs ]
+    needs: [ monorepo, ci-outputs, cd-staging ]
     if: ${{ needs.monorepo.outputs.apps != '[]' }}
     strategy:
       matrix:
