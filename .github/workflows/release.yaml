@@ -20,3 +20,87 @@ jobs:
       secret-outputs-passphrase: "${{ secrets.GHA_SECRET_OUTPUT_PASSPHRASE }}"
       ecr-region: "${{ secrets.ECR_REGION }}"
       ecr-iam-role: "${{ secrets.ECR_IAM_ROLE }}"
+
+  monorepo:
+    uses:  cloudposse/github-actions-workflows/.github/workflows/controller-monorepo.yml@main
+    with:
+      dir: ./apps
+
+  ci:
+    uses: cloudposse/github-actions-workflows/.github/workflows/ci-dockerized-app-promote.yml@main
+    needs: [monorepo]
+    if: ${{ needs.monorepo.outputs.apps != '[]' }}
+    strategy:
+      matrix:
+        app: ${{ fromJson(needs.monorepo.outputs.apps) }}
+    with:
+      organization: ${{ github.event.repository.owner.login }}
+      repository: ${{ github.event.repository.name }}
+      app: ${{ matrix.app }}
+      version: ${{ inputs.version }}
+      matrix-step-name: ci
+      matrix-key: ${{ matrix.app }}
+    secrets:
+      ecr-region: ${{ secrets.ECR_REGION }}
+      ecr-iam-role: ${{ secrets.ECR_IAM_ROLE }}
+      registry: ${{ secrets.ECR_REGISTRY }}
+      secret-outputs-passphrase: ${{ secrets.GHA_SECRET_OUTPUT_PASSPHRASE }}
+
+  ci-outputs:
+    runs-on: ubuntu-latest
+    needs: [ci]
+    steps:
+      - uses: cloudposse/github-action-matrix-outputs-read@0.1.1
+        id: current
+        with:
+          matrix-step-name: ci
+    outputs:
+      image: ${{ toJson(fromJson(steps.current.outputs.result).image) }}
+      tag: ${{ toJson(fromJson(steps.current.outputs.result).tag) }}
+
+
+  cd-staging:
+    name: cd / staging
+    uses: cloudposse/github-actions-workflows/.github/workflows/cd-ecs.yml@main
+    needs: [ monorepo, ci-outputs ]
+    if: ${{ needs.monorepo.outputs.apps != '[]' }}
+    strategy:
+      matrix:
+        app: ${{ fromJson(needs.monorepo.outputs.apps) }}
+    with:
+      image: ${{ fromJson(needs.ci-outputs.outputs.image)[matrix.app] }}
+      tag: ${{ fromJson(needs.ci-outputs.outputs.tag)[matrix.app] }}
+      repository: ${{ github.event.repository.name }}
+      app: ${{ matrix.app }}
+      environment: staging
+      spacelift-organization: ${{ github.event.repository.owner.login }}
+      matrix-step-name: cd/staging
+      matrix-key: ${{ matrix.app }}
+    secrets:
+      secret-outputs-passphrase: ${{ secrets.GHA_SECRET_OUTPUT_PASSPHRASE }}
+      github-private-actions-pat: ${{ secrets.PUBLIC_REPO_ACCESS_TOKEN }}
+      spacelift-api-key-id: ${{ secrets.SPACELIFT_API_KEY_ID }}
+      spacelift-api-key-secret: ${{ secrets.SPACELIFT_API_KEY_SECRET }}
+
+  cd-production:
+    name: cd / production
+    uses: cloudposse/github-actions-workflows/.github/workflows/cd-ecs.yml@main
+    needs: [ monorepo, ci-outputs ]
+    if: ${{ needs.monorepo.outputs.apps != '[]' }}
+    strategy:
+      matrix:
+        app: ${{ fromJson(needs.monorepo.outputs.apps) }}
+    with:
+      image: ${{ fromJson(needs.ci-outputs.outputs.image)[matrix.app] }}
+      tag: ${{ fromJson(needs.ci-outputs.outputs.tag)[matrix.app] }}
+      repository: ${{ github.event.repository.name }}
+      app: ${{ matrix.app }}
+      environment: production
+      spacelift-organization: ${{ github.event.repository.owner.login }}
+      matrix-step-name: cd/production
+      matrix-key: ${{ matrix.app }}
+    secrets:
+      secret-outputs-passphrase: ${{ secrets.GHA_SECRET_OUTPUT_PASSPHRASE }}
+      github-private-actions-pat: ${{ secrets.PUBLIC_REPO_ACCESS_TOKEN }}
+      spacelift-api-key-id: ${{ secrets.SPACELIFT_API_KEY_ID }}
+      spacelift-api-key-secret: ${{ secrets.SPACELIFT_API_KEY_SECRET }}
