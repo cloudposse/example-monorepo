@@ -1,0 +1,56 @@
+---
+#
+# This is the canonical configuration for the `README.md`
+# Run `make readme` to rebuild the `README.md`
+#
+
+# Name of this project
+name: example-monorepo
+
+# Tags of this project
+tags:
+  - example-app
+  - github-action
+  - Docker
+  - ECR
+  - ECS
+  - Spacelift
+  - CI/CD
+
+# Logo for this project
+#logo: docs/logo.png
+
+# License of this project
+license: "APACHE2"
+
+# Canonical GitHub repo
+github_repo: cloudposse/example-monorepo
+
+# Badges to display
+badges:
+  - name: "Latest Release"
+    image: "https://img.shields.io/github/release/cloudposse/example-monorepo.svg"
+    url: "https://github.com/cloudposse/example-monorepo/releases/latest"
+  - name: "Slack Community"
+    image: "https://slack.cloudposse.com/badge.svg"
+    url: "https://slack.cloudposse.com"
+
+related:
+  - name: "github-actions-workflows"
+    description: "Reusable workflows for different types of projects"
+    url: "https://github.com/cloudposse/github-actions-workflows"
+
+# Short description of this project
+description: |-
+  Example CI/CD pattern for monorepo with applications in `./apps` directory.
+  Dockerize applications, deploy them on ECS with Spacelift.
+
+introduction: |-
+  * [Docker](https://docs.docker.com/engine/reference/builder/) for developing, shipping, and running,
+  * [ECR](https://aws.amazon.com/ecr/) to store the Docker images
+  * [Spacelift](https://spacelift.io/) as CD platform 
+
+# Contributors to this project
+contributors:
+  - name: "Igor Rodionov"
+    github: "goruha"
